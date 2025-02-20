@@ -5,61 +5,70 @@ import { Send, User, Bot } from "lucide-react";
 
 const Home = () => {
   const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
+  const [messages, setMessages] = useState([]); // ✅ Added missing useState
+  const [isLoading, setIsLoading] = useState(false); // ✅ Added missing useState
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
 
-    // Add user message to history
-    const userMessage = {
-      role: "user",
-      content: prompt,
-      timestamp: new Date(),
-    };
-    setChatHistory(prev => [...prev, userMessage]);
+    const userMessage = { sender: "user", text: prompt };
+    setMessages((prev) => [...prev, userMessage]); // ✅ Corrected state update
+    setIsLoading(true);
+    setPrompt("");
 
     try {
       const res = await fetch("http://127.0.0.1:5000/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
-      const data = await res.json();
 
-      console.log("Server response:", data);
-      if (data.content) {
-        setResponse(data.content);
-        // Add assistant message to history
-        const assistantMessage = {
-          role: "assistant",
-          content: data.content,
-          timestamp: new Date(),
-        };
-        setChatHistory(prev => [...prev, assistantMessage]);
-      } else {
-        setResponse("No response from the server.");
+      if (!res.body) throw new Error("No response body received.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let result = "";
+      let botMessage = { sender: "bot", text: "" };
+
+      setMessages((prev) => [...prev, botMessage]); // ✅ Corrected placement
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        result += decoder.decode(value, { stream: true });
+
+        // ✅ Fixing ESLint issue by updating state correctly
+        setMessages((prev) => {
+          const lastMessageIndex = prev.length - 1;
+          return prev.map((msg, index) =>
+            index === lastMessageIndex ? { ...msg, text: result } : msg
+          );
+        });
       }
     } catch (error) {
       console.error("Error:", error);
-      setResponse("An error occurred while fetching the response.");
+      setMessages((prev) => [
+        ...prev,
+        { sender: "bot", text: "An error occurred." },
+      ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -71,10 +80,7 @@ const Home = () => {
         </div>
         <div className="sidebar-content">
           {chatHistory.map((message, index) => (
-            <div 
-              key={index}
-              className={`history-item ${message.role}`}
-            >
+            <div key={index} className={`history-item ${message.role}`}>
               <div className="history-meta">
                 <div className="history-role-container">
                   {message.role === "user" ? (
@@ -102,29 +108,23 @@ const Home = () => {
       <main className="main">
         <div className="chat-container">
           <div className="chat-content">
-            {prompt && (
-              <div className="message user">
+            {messages.map((msg, index) => (
+              <div key={index} className={`message ${msg.sender}`}>
                 <div className="message-header">
-                  <User className="h-5 w-5 text-purple-light" />
-                  <span className="message-role">You</span>
+                  {msg.sender === "user" ? (
+                    <User className="h-5 w-5 text-purple-light" />
+                  ) : (
+                    <Bot className="h-5 w-5 text-purple-light" />
+                  )}
+                  <span className="message-role">
+                    {msg.sender === "user" ? "You" : "Assistant"}
+                  </span>
                 </div>
-                <p>{prompt}</p>
-              </div>
-            )}
-            {response && (
-              <div className="message assistant">
-                <div className="message-header">
-                  <Bot className="h-5 w-5 text-purple-light" />
-                  <span className="message-role">Assistant</span>
-                </div>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  className="prose"
-                >
-                  {response}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose">
+                  {msg.text}
                 </ReactMarkdown>
               </div>
-            )}
+            ))}
           </div>
         </div>
 
