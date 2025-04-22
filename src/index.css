@@ -102,6 +102,11 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.logo{
+  text-align: center;
+  margin-top: 2%;
+  font-family: system-ui, -apple-system, sans-serif;
+}
 .sidebar-header h2 {
   font-size: 1.125rem;
   font-weight: 600;

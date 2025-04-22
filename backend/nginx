@@ -1,0 +1,210 @@
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/client-body-timeout: 180s
+    custom.nginx.org/client-header-buffer-size: 2048k
+    custom.nginx.org/client-header-timeout: 180s
+    custom.nginx.org/large-client-header-buffers: 2 2048k
+    meta.helm.sh/release-name: dev2live
+    meta.helm.sh/release-namespace: echannel
+    nginx.org/client-max-body-size: "0"
+    nginx.org/hsts: "true"
+    nginx.org/proxy-buffer-size: 256k
+    nginx.org/proxy-buffering: "false"
+    nginx.org/proxy-buffers: 4 256k
+    nginx.org/proxy-connect-timeout: 180s
+    nginx.org/proxy-read-timeout: 180s
+    nginx.org/proxy-send-timeout: 180s
+    nginx.org/server-snippets: |
+      if ($request_method !~ ^(GET|HEAD|POST|PUT|DELETE)$ )
+      {
+      return 405;
+      }
+      proxy_hide_header X-Frame-Options;
+      rewrite ^/webapp/wcs/stores/servlet/LINSafetyDataSheetsView?(.*)$ /shop/LINSafetyDataSheetsView?$1 redirect;
+      if ($request_uri !~ "^/shop/en/au/home") { rewrite ^/shop/[^/]+/[^/].* /shop/en/au/home redirect; }
+      add_header Set-Cookie "WC_GENERIC_ACTIVITYDATA=deleted; Expires=Thu, 01-Jan-1970 00:00:01 GMT; Path=/";
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Access-Control-Allow-Origin https://dev.b2c.linde.com;
+
+    nginx.org/server-tokens: "false"
+    nginx.org/ssl-services: ecdev2livecrs-app,ecdev2livets-web,ecdev2livets-app,ecdev2livesearch-app-master,ecdev2sidecar-svc
+  creationTimestamp: "2024-10-09T09:53:47Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    group: ecdev2live
+  name: ecdev2live-ingress
+  namespace: echannel
+  resourceVersion: "223600156"
+  uid: d8ce81e0-bced-4610-b209-11b7d81a12f9
+spec:
+  ingressClassName: nginx-dev2
+  rules:
+  - host: cmc.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-web
+            port:
+              number: 8000
+        path: /
+        pathType: ImplementationSpecific
+  - host: accelerator.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-web
+            port:
+              number: 8001
+        path: /
+        pathType: ImplementationSpecific
+  - host: admin.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-web
+            port:
+              number: 8002
+        path: /
+        pathType: ImplementationSpecific
+  - host: org.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-web
+            port:
+              number: 8004
+        path: /
+        pathType: ImplementationSpecific
+
+
+  - host: store.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livecrs-app
+            port:
+              number: 8443
+        path: /
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livecrs-app
+            port:
+              number: 8443
+        path: /wcsstore
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livecrs-app
+            port:
+              number: 8443
+        path: /shop
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livecrs-app
+            port:
+              number: 8443
+        path: /cachemonitor
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livets-app
+            port:
+              number: 5443
+        path: /wcs
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livets-app
+            port:
+              number: 5443
+        path: /webapp/wcs/stores
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livets-app
+            port:
+              number: 5443
+        path: /webapp/wcs/component
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ecdev2livecrs-app
+            port:
+              number: 8443
+        path: /webapp/remote/preview
+        pathType: ImplementationSpecific
+
+
+
+
+  - host: search.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livesearch-app-master
+            port:
+              number: 3738
+        path: /
+        pathType: ImplementationSpecific
+  - host: tsapp.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-app
+            port:
+              number: 5443
+        path: /
+        pathType: ImplementationSpecific
+  - host: wasadmin.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2livets-app
+            port:
+              number: 9043
+        path: /
+        pathType: ImplementationSpecific
+  - host: logs.ecdev2live.linde.grp
+    http:
+      paths:
+      - backend:
+          service:
+            name: ecdev2sidecar-svc
+            port:
+              number: 443
+        path: /
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - cmc.ecdev2live.linde.grp
+    - accelerator.ecdev2live.linde.grp
+    - admin.ecdev2live.linde.grp
+    - org.ecdev2live.linde.grp
+    - store.ecdev2live.linde.grp
+    - search.ecdev2live.linde.grp
+    - tsapp.ecdev2live.linde.grp
+    - wasadmin.ecdev2live.linde.grp
+    - logs.ecdev2live.linde.grp
+    secretName: ecdev2live-certificate
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.151.101.9
+this is the complete ingress file

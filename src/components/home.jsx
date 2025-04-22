@@ -1,20 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, User, Bot } from "lucide-react";
+import { Send, User, Bot, Trash } from "lucide-react";
+import { motion } from "framer-motion";
 
 const Home = () => {
   const [prompt, setPrompt] = useState("");
+  const [messages, setMessages] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
-  const [messages, setMessages] = useState([]); // ✅ Added missing useState
-  const [isLoading, setIsLoading] = useState(false); // ✅ Added missing useState
+  const [isLoading, setIsLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
 
-    const userMessage = { sender: "user", text: prompt };
-    setMessages((prev) => [...prev, userMessage]); // ✅ Corrected state update
+    const userMessage = { sender: "user", text: prompt, timestamp: new Date() };
+    setMessages((prev) => [...prev, userMessage]);
+    setChatHistory((prev) => [...prev, userMessage]);
     setIsLoading(true);
     setPrompt("");
 
@@ -30,29 +37,39 @@ const Home = () => {
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let result = "";
-      let botMessage = { sender: "bot", text: "" };
-
-      setMessages((prev) => [...prev, botMessage]); // ✅ Corrected placement
+      let botMessage = { sender: "bot", text: "", timestamp: new Date() };
+      setMessages((prev) => [...prev, botMessage]);
+      setChatHistory((prev) => [...prev, botMessage]);
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         result += decoder.decode(value, { stream: true });
-
-        // ✅ Fixing ESLint issue by updating state correctly
-        setMessages((prev) => {
-          const lastMessageIndex = prev.length - 1;
-          return prev.map((msg, index) =>
-            index === lastMessageIndex ? { ...msg, text: result } : msg
-          );
-        });
       }
+
+      const words = result.split(" ");
+      let currentText = "";
+      words.forEach((word, index) => {
+        setTimeout(() => {
+          currentText += (index === 0 ? "" : " ") + word;
+          setMessages((prev) => {
+            const lastIndex = prev.length - 1;
+            return prev.map((msg, idx) =>
+              idx === lastIndex ? { ...msg, text: currentText } : msg
+            );
+          });
+          setChatHistory((prev) => {
+            const lastIndex = prev.length - 1;
+            return prev.map((msg, idx) =>
+              idx === lastIndex ? { ...msg, text: currentText } : msg
+            );
+          });
+        }, index * 100);
+      });
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        { sender: "bot", text: "An error occurred." },
-      ]);
+      setMessages((prev) => [...prev, { sender: "bot", text: "An error occurred.", timestamp: new Date() }]);
+      setChatHistory((prev) => [...prev, { sender: "bot", text: "An error occurred.", timestamp: new Date() }]);
     } finally {
       setIsLoading(false);
     }
@@ -65,40 +82,52 @@ const Home = () => {
     }
   };
 
-  const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleClearHistory = async () => {
+    try {
+      await fetch("http://localhost:5000/clear_history", {
+        method: "POST",
+      });
+      setMessages([]);
+      setChatHistory([]);
+    } catch (error) {
+      console.error("Error clearing history:", error);
+    }
   };
 
   return (
     <div className="min-h-screen flex w-full">
+
       <div className="sidebar">
         <div className="sidebar-header">
           <h2>Chat History</h2>
+          <button className="clear-history-button" onClick={handleClearHistory}>
+            <Trash className="h-5 w-5 text-red-500" />
+          </button>
         </div>
         <div className="sidebar-content">
           {chatHistory.map((message, index) => (
-            <div key={index} className={`history-item ${message.role}`}>
+            <div key={index} className={`history-item ${message.sender}`}>
               <div className="history-meta">
                 <div className="history-role-container">
-                  {message.role === "user" ? (
+                  {message.sender === "user" ? (
                     <User className="h-4 w-4 text-purple-light" />
                   ) : (
                     <Bot className="h-4 w-4 text-purple-light" />
                   )}
                   <span className="history-role">
-                    {message.role === "user" ? "You" : "Assistant"}
+                    {message.sender === "user" ? "You" : "Assistant"}
                   </span>
                 </div>
                 <span className="history-time">
-                  {formatTime(message.timestamp)}
+                  {new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
               <p className="history-content">
-                {message.content.slice(0, 60)}
-                {message.content.length > 60 ? "..." : ""}
+                {message.text.slice(0, 60)}
+                {message.text.length > 60 ? "..." : ""}
               </p>
             </div>
           ))}
@@ -106,25 +135,27 @@ const Home = () => {
       </div>
 
       <main className="main">
+      <h1 className="logo">SolveIt</h1>
         <div className="chat-container">
           <div className="chat-content">
             {messages.map((msg, index) => (
-              <div key={index} className={`message ${msg.sender}`}>
+              <motion.div 
+                key={index} 
+                className={`message ${msg.sender}`} 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ duration: 0.3 }}
+              >
                 <div className="message-header">
-                  {msg.sender === "user" ? (
-                    <User className="h-5 w-5 text-purple-light" />
-                  ) : (
-                    <Bot className="h-5 w-5 text-purple-light" />
-                  )}
-                  <span className="message-role">
-                    {msg.sender === "user" ? "You" : "Assistant"}
-                  </span>
+                  {msg.sender === "user" ? <User className="h-5 w-5 text-purple-light" /> : <Bot className="h-5 w-5 text-purple-light" />}
+                  <span className="message-role">{msg.sender === "user" ? "You" : "Assistant"}</span>
                 </div>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose">
                   {msg.text}
                 </ReactMarkdown>
-              </div>
+              </motion.div>
             ))}
+            <div ref={chatEndRef} />
           </div>
         </div>
 
